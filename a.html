@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Winter Arc Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#eef4f7;--card:#fff;--ink:#12212b;--mute:#5d7280;--line:#d3e0e7;--ice:#2a86a8;--gym:#d1622b;--code:#2a86a8;--food:#5a8f3d;--sleep:#7a5cc4;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1820;--card:#15262f;--ink:#e6f1f6;--mute:#8aa3b1;--line:#243a46;--ice:#6cc7e4;--gym:#f08a52;--code:#6cc7e4;--food:#8cc86a;--sleep:#a68cf0}}
+:root[data-theme="dark"]{--bg:#0d1820;--card:#15262f;--ink:#e6f1f6;--mute:#8aa3b1;--line:#243a46;--ice:#6cc7e4;--gym:#f08a52;--code:#6cc7e4;--food:#8cc86a;--sleep:#a68cf0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.5}
+main{max-width:560px;margin:0 auto;padding:24px 18px 48px}
+h1{font-size:2.2rem;font-weight:800;letter-spacing:-.03em;margin:0;line-height:1.1}
+.sub{color:var(--mute);margin:6px 0 20px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.stat b{display:block;font-size:1.6rem;font-weight:800;letter-spacing:-.02em}
+.stat span{font-size:.85rem;color:var(--mute)}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-bottom:22px}
+.bar i{display:block;height:100%;width:0;background:var(--ice);transition:width .4s}
+form.add{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+input,select,button{font:inherit;color:var(--ink)}
+input[type=text]{flex:1 1 180px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card)}
+select{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card)}
+.btn{padding:12px 18px;border:0;border-radius:10px;background:var(--ice);color:#fff;font-weight:600;cursor:pointer}
+:root:not([data-theme="light"]) .btn{color:#06222d}
+:focus-visible{outline:3px solid var(--ice);outline-offset:2px}
+h2{font-size:1.05rem;margin:22px 0 8px;font-weight:600}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+li input{width:22px;height:22px;accent-color:var(--c);flex:none;cursor:pointer}
+li span{flex:1}
+li.done span{text-decoration:line-through;color:var(--mute)}
+li button{background:none;border:0;color:var(--mute);cursor:pointer;font-size:1.2rem;padding:4px 8px;border-radius:6px}
+.gym{--c:var(--gym)}.code{--c:var(--code)}.food{--c:var(--food)}.sleep{--c:var(--sleep)}
+.empty{color:var(--mute);padding:8px 2px}
+.foot{display:flex;justify-content:space-between;gap:10px;margin-top:26px}
+.link{background:none;border:0;color:var(--mute);text-decoration:underline;cursor:pointer;padding:6px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1>Winter Arc</h1>
+  <p class="sub" id="day"></p>
+  <div class="stats">
+    <div class="stat"><b id="sDone">0/0</b><span>done today</span></div>
+    <div class="stat"><b id="sStreak">0</b><span>day streak</span></div>
+    <div class="stat"><b id="sDays">0</b><span>perfect days</span></div>
+  </div>
+  <div class="bar"><i id="fill"></i></div>
+  <form class="add" id="form">
+    <input type="text" id="text" placeholder="Add a daily task" aria-label="Task name" required maxlength="80">
+    <select id="cat" aria-label="Category">
+      <option value="gym">Gym</option><option value="code">Code</option><option value="food">Food</option><option value="sleep">Sleep</option>
+    </select>
+    <button class="btn" type="submit">Add task</button>
+  </form>
+  <div id="list"></div>
+  <div class="foot">
+    <button class="link" id="reset">Reset all data</button>
+    <button class="link" id="theme">Switch theme</button>
+  </div>
+</main>
+<script>
+const KEY="winterArc.v1";
+const defaults=[
+ {id:1,text:"Gym session (60 min)",cat:"gym"},
+ {id:2,text:"Hit protein target",cat:"food"},
+ {id:3,text:"Eat calorie surplus",cat:"food"},
+ {id:4,text:"Vibe code 2 hours",cat:"code"},
+ {id:5,text:"Commit code to Git",cat:"code"},
+ {id:6,text:"Sleep 7-8 hours",cat:"sleep"}
+];
+const names={gym:"Gym",code:"Coding",food:"Food",sleep:"Sleep"};
+let state=load();
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.tasks)return s}catch(e){}
+  return {tasks:defaults.slice(),done:{},next:10};
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+const today=ymd(new Date());
+const isPerfect=k=>{const d=state.done[k]||[];return state.tasks.length>0&&state.tasks.every(t=>d.includes(t.id))};
+function streak(){
+  let n=0,d=new Date();
+  if(!isPerfect(ymd(d)))d.setDate(d.getDate()-1);
+  while(isPerfect(ymd(d))){n++;d.setDate(d.getDate()-1)}
+  return n;
+}
+function render(){
+  const done=state.done[today]||[];
+  const list=document.getElementById("list");
+  list.innerHTML="";
+  Object.keys(names).forEach(c=>{
+    const items=state.tasks.filter(t=>t.cat===c);
+    if(!items.length)return;
+    const h=document.createElement("h2");h.textContent=names[c];list.appendChild(h);
+    const ul=document.createElement("ul");
+    items.forEach(t=>{
+      const li=document.createElement("li");
+      li.className=c+(done.includes(t.id)?" done":"");
+      const cb=document.createElement("input");cb.type="checkbox";cb.checked=done.includes(t.id);
+      cb.setAttribute("aria-label",t.text);
+      cb.onchange=()=>toggle(t.id);
+      const sp=document.createElement("span");sp.textContent=t.text;
+      const x=document.createElement("button");x.textContent="\u00d7";x.setAttribute("aria-label","Delete "+t.text);
+      x.onclick=()=>remove(t.id);
+      li.append(cb,sp,x);ul.appendChild(li);
+    });
+    list.appendChild(ul);
+  });
+  if(!state.tasks.length)list.innerHTML='<p class="empty">No tasks yet. Add your first daily task above.</p>';
+  const total=state.tasks.length,n=state.tasks.filter(t=>done.includes(t.id)).length;
+  document.getElementById("sDone").textContent=n+"/"+total;
+  document.getElementById("fill").style.width=(total?n/total*100:0)+"%";
+  document.getElementById("sStreak").textContent=streak();
+  document.getElementById("sDays").textContent=Object.keys(state.done).filter(isPerfect).length;
+  const start=new Date(2026,9,1),diff=Math.floor((new Date()-start)/864e5)+1;
+  document.getElementById("day").textContent=diff>0?"Day "+diff+" of 90 since Oct 1. Tasks repeat every day.":"Starts Oct 1. Tasks repeat every day.";
+}
+function toggle(id){
+  const d=state.done[today]||[];
+  state.done[today]=d.includes(id)?d.filter(x=>x!==id):d.concat(id);
+  save();render();
+}
+function remove(id){state.tasks=state.tasks.filter(t=>t.id!==id);save();render()}
+document.getElementById("form").onsubmit=e=>{
+  e.preventDefault();
+  const t=document.getElementById("text");
+  state.tasks.push({id:state.next++,text:t.value.trim(),cat:document.getElementById("cat").value});
+  t.value="";save();render();
+};
+document.getElementById("reset").onclick=()=>{
+  if(confirm("Delete all tasks and history?")){state={tasks:defaults.slice(),done:{},next:10};save();render()}
+};
+document.getElementById("theme").onclick=()=>{
+  const r=document.documentElement,dark=getComputedStyle(r).getPropertyValue("--bg").trim()==="#0d1820";
+  r.setAttribute("data-theme",dark?"light":"dark");
+};
+render();
+</script>
+</body>
+</html>
